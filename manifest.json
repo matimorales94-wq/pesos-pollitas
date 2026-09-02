@@ -1,0 +1,9 @@
+{
+  "name":"Pesos Pollitas Pro",
+  "short_name":"Pesos Pollitas",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f4f7f3",
+  "theme_color":"#245c3a",
+  "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
