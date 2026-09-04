@@ -102,7 +102,95 @@ function exportJSON(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'appli
 function importJSON(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!x.lotes||!x.pesajes)throw 0;db=x;save();renderAll();toast('Copia restaurada')}catch{toast('Archivo de copia no válido')}};r.readAsText(f)}
 function exportCSV(){let rows=[['Lote','Genética','Galpón','Fecha','Semana','Aves','Promedio_g','Objetivo_g','Uniformidad_pct','CV_pct','Min_g','Max_g']];db.pesajes.forEach(p=>{let l=db.lotes.find(x=>x.id===p.loteId);rows.push([l?.nombre||'',l?.genetica||'',l?.galpon||'',p.fecha,p.semana,p.pesos.length,p.stats.m.toFixed(1),p.objetivo||'',p.stats.u.toFixed(1),p.stats.cv.toFixed(1),p.stats.min,p.stats.max])});let csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n'),blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pesos_pollitas.csv';a.click();URL.revokeObjectURL(a.href)}
 if(!db.lotes.length){db.lotes=[{id:uid(),nombre:'Primer lote',genetica:'Hy-Line W-80',galpon:'',nacimiento:'',cantidad:0,origen:''}];save()}
-renderAll();
+renderAll();/* AUTO EDAD + REFERENCIA HY-LINE W-80 */
+const HYLINE_W80={
+1:[67,75],2:[125,137],3:[187,206],4:[256,280],
+5:[331,361],6:[414,450],7:[504,546],8:[598,645],
+9:[692,744],10:[783,840],11:[867,927],12:[942,1004],
+13:[1008,1070],14:[1066,1127],15:[1116,1177],
+16:[1164,1223],17:[1212,1269],18:[1252,1332]
+};
+
+function fechaLocal(s){
+  if(!s)return null;
+  let [y,m,d]=s.split('-').map(Number);
+  return new Date(y,m-1,d);
+}
+
+function edadLote(nacimiento,fecha){
+  let b=fechaLocal(nacimiento),f=fechaLocal(fecha);
+  if(!b||!f)return null;
+  let dias=Math.floor((f-b)/86400000);
+  if(dias<0)return {error:true};
+  return {
+    semanas:Math.floor(dias/7),
+    dias:dias%7
+  };
+}
+
+function esW80(lote){
+  return /w[- ]?80/i.test(lote?.genetica||'');
+}
+
+function updatePesajeMeta(){
+  let lote=db.lotes.find(x=>x.id===$('pLote').value);
+  let edad=edadLote(lote?.nacimiento,$('pFecha').value);
+
+  let detalle=$('pEdadDetalle');
+  let ref=$('pReferencia');
+
+  if(!detalle){
+    detalle=document.createElement('div');
+    detalle.id='pEdadDetalle';
+    detalle.className='muted';
+    $('pSemana').parentElement.appendChild(detalle);
+  }
+
+  if(!ref){
+    ref=document.createElement('div');
+    ref.id='pReferencia';
+    ref.className='muted';
+    $('pObjetivo').parentElement.appendChild(ref);
+  }
+
+  if(!edad){
+    detalle.textContent='Ingresá la fecha de nacimiento del lote para calcular la edad automáticamente.';
+    ref.textContent='';
+    $('pSemana').readOnly=false;
+    $('pObjetivo').readOnly=false;
+    return;
+  }
+
+  if(edad.error){
+    detalle.textContent='La fecha del pesaje no puede ser anterior al nacimiento.';
+    ref.textContent='';
+    $('pSemana').value='';
+    $('pObjetivo').value='';
+    return;
+  }
+
+  let ws=edad.semanas;
+  let ds=edad.dias;
+
+  detalle.textContent=`Edad automática: ${ws} semana${ws===1?'':'s'} + ${ds} día${ds===1?'':'s'}`;
+  $('pSemana').value=ws;
+  $('pSemana').readOnly=true;
+
+  if(esW80(lote) && HYLINE_W80[ws]){
+    let [min,max]=HYLINE_W80[ws];
+    let centro=Math.round((min+max)/2);
+    $('pObjetivo').value=centro;
+    $('pObjetivo').readOnly=true;
+    ref.textContent=`Hy-Line W-80: ${min}–${max} g · referencia central: ${centro} g`;
+  }else{
+    $('pObjetivo').readOnly=false;
+    ref.textContent='Sin referencia automática para esta genética o edad.';
+  }
+}
+
+$('pLote').addEventListener('change',updatePesajeMeta);
+$('pFecha').addEventListener('change',updatePesajeMeta);
+updatePesajeMeta();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body></html>
