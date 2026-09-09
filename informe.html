@@ -437,7 +437,21 @@ ${p.pesos.length}
 <div class="status">
 ${estado}
 </div>
+<h2>Gráficos</h2>
 
+<div class="charts">
+
+<div class="chartBox">
+<b>Evolución del peso promedio</b>
+<canvas id="graficoEvolucion" height="220"></canvas>
+</div>
+
+<div class="chartBox">
+<b>Peso vs. referencia Hy-Line W-80</b>
+<canvas id="graficoReferencia" height="220"></canvas>
+</div>
+
+</div>
 <h2>Observación</h2>
 
 <p>
@@ -477,7 +491,94 @@ ${esc(l?.nombre||'-')} · semana ${p.semana} · ${esc(p.fecha)}
 }).join('');
 
 render();
+function dibujarGraficos(){
 
+let pesajesLote=db.pesajes
+.filter(x=>x.loteId===db.pesajes.find(p=>p.id===$('sel').value)?.loteId)
+.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+
+let canvas=$('graficoEvolucion');
+let ctx=canvas.getContext('2d');
+
+let w=canvas.width=canvas.clientWidth*2;
+let h=canvas.height=220*2;
+
+ctx.clearRect(0,0,w,h);
+ctx.font='24px Arial';
+
+if(pesajesLote.length===0)return;
+
+let valores=pesajesLote.map(x=>x.stats.m);
+let max=Math.max(...valores,...pesajesLote.map(x=>x.objetivo||0));
+let min=Math.min(...valores);
+
+let margen=40;
+let ancho=w-margen*2;
+let alto=h-margen*2;
+
+ctx.beginPath();
+
+pesajesLote.forEach((p,i)=>{
+
+let x=margen+(i/(Math.max(pesajesLote.length-1,1)))*ancho;
+let y=h-margen-((p.stats.m-min)/(max-min||1))*alto;
+
+if(i===0)ctx.moveTo(x,y);
+else ctx.lineTo(x,y);
+
+});
+
+ctx.stroke();
+
+pesajesLote.forEach((p,i)=>{
+
+let x=margen+(i/(Math.max(pesajesLote.length-1,1)))*ancho;
+let y=h-margen-((p.stats.m-min)/(max-min||1))*alto;
+
+ctx.beginPath();
+ctx.arc(x,y,6,0,Math.PI*2);
+ctx.fill();
+
+ctx.fillText(p.stats.m.toFixed(0)+' g',x-20,y-12);
+
+});
+
+let ultimo=pesajesLote[pesajesLote.length-1];
+
+let canvas2=$('graficoReferencia');
+let ctx2=canvas2.getContext('2d');
+
+let w2=canvas2.width=canvas2.clientWidth*2;
+let h2=canvas2.height=220*2;
+
+ctx2.clearRect(0,0,w2,h2);
+ctx2.font='26px Arial';
+
+let promedio=ultimo.stats.m;
+let referencia=ultimo.objetivo;
+
+let centro=w2/2;
+
+ctx2.textAlign='center';
+
+ctx2.fillText('Promedio',centro,45);
+ctx2.font='bold 42px Arial';
+ctx2.fillText(promedio.toFixed(0)+' g',centro,95);
+
+ctx2.font='26px Arial';
+
+if(referencia){
+
+ctx2.fillText('Referencia Hy-Line',centro,145);
+
+ctx2.font='bold 42px Arial';
+ctx2.fillText(referencia.toFixed(0)+' g',centro,195);
+
+}
+
+}
+
+dibujarGraficos();
 </script>
 
 </body>
