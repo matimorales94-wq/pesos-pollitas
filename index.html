@@ -41,7 +41,7 @@ canvas{width:100%;height:220px;border:1px solid #e4e9e4;border-radius:12px;backg
 </div>
 
 <section id="inicio">
-<div class="card"><h2>Resumen del lote</h2><label>Lote</label><select id="selLote" onchange="renderHome()"></select><div id="home"></div></div>
+<div class="card"><h2>Resumen del lote</h2><label>Lote</label><select id="selLote" onchange="renderHome();drawChart()"></select><div id="home"></div></div>
 <div class="card"><h2>Curva de peso promedio</h2><canvas id="chart" width="900" height="220"></canvas><p class="muted">La línea punteada representa el objetivo cargado en cada pesaje.</p></div>
 </section>
 
