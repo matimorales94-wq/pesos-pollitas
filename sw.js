@@ -1,4 +1,4 @@
-const CACHE='pesos-pollitas-pro-v5';
+const CACHE='pesos-pollitas-pro-v6';
 const ASSETS=['./','./index.html','./manifest.json','./icon.svg','./Gottig-Emprendimiento-Logo.png'];
 
 self.addEventListener('install',e=>
