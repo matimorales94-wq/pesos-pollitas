@@ -305,7 +305,7 @@ display:none
 
 <div class="selector">
 <label><b>Elegí el pesaje a informar</b></label>
-<select id="sel" onchange="render()"></select>
+<select id="sel" onchange="render();dibujarGraficos()"></select>
 </div>
 
 <div id="report" class="report"></div>
@@ -521,38 +521,73 @@ ${esc(l?.nombre||'-')} · semana ${p.semana} · ${esc(p.fecha)}
 render();
 function dibujarGraficos(){
 
+let seleccionado=db.pesajes.find(p=>p.id===$('sel').value);
+
+if(!seleccionado)return;
+
 let pesajesLote=db.pesajes
-.filter(x=>x.loteId===db.pesajes.find(p=>p.id===$('sel').value)?.loteId)
+.filter(x=>x.loteId===seleccionado.loteId)
 .sort((a,b)=>a.fecha.localeCompare(b.fecha));
 
 let canvas=$('graficoEvolucion');
+let canvas2=$('graficoReferencia');
+
+if(!canvas||!canvas2)return;
+
 let ctx=canvas.getContext('2d');
 
 let w=canvas.width=canvas.clientWidth*2;
 let h=canvas.height=220*2;
 
 ctx.clearRect(0,0,w,h);
-ctx.font='24px Arial';
 
 if(pesajesLote.length===0)return;
 
 let valores=pesajesLote.map(x=>x.stats.m);
-let max=Math.max(...valores,...pesajesLote.map(x=>x.objetivo||0));
-let min=Math.min(...valores);
+
+let objetivos=pesajesLote
+.map(x=>Number(x.objetivo))
+.filter(x=>Number.isFinite(x));
+
+let max=Math.max(...valores,...objetivos);
+let min=Math.min(...valores,...objetivos);
+
+if(max===min){
+max+=10;
+min-=10;
+}
 
 let margen=40;
 let ancho=w-margen*2;
 let alto=h-margen*2;
 
+function punto(valor,i){
+
+let x=margen+
+(i/Math.max(pesajesLote.length-1,1))*ancho;
+
+let y=h-margen-
+((valor-min)/(max-min))*alto;
+
+return {x,y};
+
+}
+
+ctx.font='24px Arial';
+ctx.textAlign='left';
+
+/* PESO REAL */
+
 ctx.beginPath();
 
 pesajesLote.forEach((p,i)=>{
 
-let x=margen+(i/(Math.max(pesajesLote.length-1,1)))*ancho;
-let y=h-margen-((p.stats.m-min)/(max-min||1))*alto;
+let q=punto(p.stats.m,i);
 
-if(i===0)ctx.moveTo(x,y);
-else ctx.lineTo(x,y);
+if(i===0)
+ctx.moveTo(q.x,q.y);
+else
+ctx.lineTo(q.x,q.y);
 
 });
 
@@ -560,52 +595,170 @@ ctx.stroke();
 
 pesajesLote.forEach((p,i)=>{
 
-let x=margen+(i/(Math.max(pesajesLote.length-1,1)))*ancho;
-let y=h-margen-((p.stats.m-min)/(max-min||1))*alto;
+let q=punto(p.stats.m,i);
 
 ctx.beginPath();
-ctx.arc(x,y,6,0,Math.PI*2);
+ctx.arc(q.x,q.y,6,0,Math.PI*2);
 ctx.fill();
 
-ctx.fillText(p.stats.m.toFixed(0)+' g',x-20,y-12);
+ctx.fillText(
+p.stats.m.toFixed(0)+' g',
+q.x-20,
+q.y-12
+);
 
 });
 
-let ultimo=pesajesLote[pesajesLote.length-1];
+/* OBJETIVO HY-LINE */
 
-let canvas2=$('graficoReferencia');
+let referencias=pesajesLote
+.map((p,i)=>({
+p:p,
+i:i,
+objetivo:Number(p.objetivo)
+}))
+.filter(x=>Number.isFinite(x.objetivo));
+
+if(referencias.length>0){
+
+ctx.save();
+
+ctx.setLineDash([18,12]);
+
+ctx.beginPath();
+
+referencias.forEach((r,index)=>{
+
+let q=punto(r.objetivo,r.i);
+
+if(index===0)
+ctx.moveTo(q.x,q.y);
+else
+ctx.lineTo(q.x,q.y);
+
+});
+
+ctx.stroke();
+
+ctx.restore();
+
+ctx.setLineDash([]);
+
+referencias.forEach(r=>{
+
+let q=punto(r.objetivo,r.i);
+
+ctx.fillText(
+r.objetivo.toFixed(0)+' g',
+q.x-20,
+q.y+28
+);
+
+});
+
+}
+
+/* SEGUNDO GRÁFICO: PESO VS OBJETIVO */
+
 let ctx2=canvas2.getContext('2d');
 
 let w2=canvas2.width=canvas2.clientWidth*2;
 let h2=canvas2.height=220*2;
 
 ctx2.clearRect(0,0,w2,h2);
-ctx2.font='26px Arial';
 
-let promedio=ultimo.stats.m;
-let referencia=ultimo.objetivo;
+ctx2.font='24px Arial';
+ctx2.textAlign='left';
 
-let centro=w2/2;
+let valoresComparacion=
+pesajesLote.filter(p=>Number.isFinite(Number(p.objetivo)));
 
-ctx2.textAlign='center';
+if(valoresComparacion.length>0){
 
-ctx2.fillText('Promedio',centro,45);
-ctx2.font='bold 42px Arial';
-ctx2.fillText(promedio.toFixed(0)+' g',centro,95);
+let datos=[
+...valoresComparacion.map(p=>p.stats.m),
+...valoresComparacion.map(p=>Number(p.objetivo))
+];
 
-ctx2.font='26px Arial';
+let max2=Math.max(...datos);
+let min2=Math.min(...datos);
 
-if(referencia){
+if(max2===min2){
+max2+=10;
+min2-=10;
+}
 
-ctx2.fillText('Referencia Hy-Line',centro,145);
+let margen2=40;
+let ancho2=w2-margen2*2;
+let alto2=h2-margen2*2;
 
-ctx2.font='bold 42px Arial';
-ctx2.fillText(referencia.toFixed(0)+' g',centro,195);
+function punto2(valor,i){
+
+let x=margen2+
+(i/Math.max(valoresComparacion.length-1,1))*ancho2;
+
+let y=h2-margen2-
+((valor-min2)/(max2-min2))*alto2;
+
+return {x,y};
+
+}
+
+/* PESO */
+
+ctx2.beginPath();
+
+valoresComparacion.forEach((p,i)=>{
+
+let q=punto2(p.stats.m,i);
+
+if(i===0)
+ctx2.moveTo(q.x,q.y);
+else
+ctx2.lineTo(q.x,q.y);
+
+});
+
+ctx2.stroke();
+
+valoresComparacion.forEach((p,i)=>{
+
+let q=punto2(p.stats.m,i);
+
+ctx2.beginPath();
+ctx2.arc(q.x,q.y,6,0,Math.PI*2);
+ctx2.fill();
+
+});
+
+/* OBJETIVO */
+
+ctx2.save();
+
+ctx2.setLineDash([18,12]);
+
+ctx2.beginPath();
+
+valoresComparacion.forEach((p,i)=>{
+
+let q=punto2(Number(p.objetivo),i);
+
+if(i===0)
+ctx2.moveTo(q.x,q.y);
+else
+ctx2.lineTo(q.x,q.y);
+
+});
+
+ctx2.stroke();
+
+ctx2.restore();
+
+ctx2.setLineDash([]);
 
 }
 
 }
-
 dibujarGraficos();
 </script>
 
